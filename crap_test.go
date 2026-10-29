@@ -89,6 +89,30 @@ func (H[E]) oneParam() {}
 	}
 }
 
+func TestStatementsWithoutProfile(t *testing.T) {
+	fs := funcs(t, `package x
+func f(x int) int {
+	y := x
+	if y > 0 {
+		y++
+	}
+	switch y {
+	case 1:
+		return 1
+	}
+	return y
+}
+func empty() {}
+`)
+	// y :=, if, y++, switch, return 1, return y
+	if got := statements(fs["f"]); got != 6 {
+		t.Errorf("f: %d statements, want 6", got)
+	}
+	if got := statements(fs["empty"]); got != 0 {
+		t.Errorf("empty: %d statements, want 0", got)
+	}
+}
+
 func TestSortWorstFirstBreaksTiesByName(t *testing.T) {
 	fs := []Func{{Name: "b", CRAP: 2}, {Name: "a", CRAP: 2}, {Name: "c", CRAP: 5}}
 	sortWorstFirst(fs)

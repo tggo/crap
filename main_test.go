@@ -36,6 +36,15 @@ func TestRunOnDemoModule(t *testing.T) {
 	if add.Package != "example.com/demo/calc" || add.Coverage != 0 || add.CRAP != 2 {
 		t.Errorf("Add: %+v", add)
 	}
+	if sign.Statements != 5 || sign.Uncovered != 0 {
+		t.Errorf("Sign statements: %+v", sign)
+	}
+	if grade.Statements != 5 || grade.Uncovered != 5 {
+		t.Errorf("Grade statements: %+v", grade)
+	}
+	if add.Statements != 1 || add.Uncovered != 1 {
+		t.Errorf("Add statements: %+v", add)
+	}
 	if got[0].Name != "Grade" {
 		t.Errorf("worst first, got %s", got[0].Name)
 	}

@@ -21,6 +21,10 @@ type Func struct {
 	Complexity int     `json:"complexity"`
 	Coverage   float64 `json:"coverage"`
 	CRAP       float64 `json:"crap"`
+	// Statements is the function's statement count, as go test counts them.
+	Statements int `json:"statements"`
+	// Uncovered is how many of those statements no test reached.
+	Uncovered int `json:"uncovered"`
 }
 
 // score is CC² × (1 − coverage)³ + CC, with coverage in [0, 1].
@@ -78,9 +82,9 @@ func recvType(e ast.Expr) string {
 	return "?"
 }
 
-// coverage is the share of the function's statements that ran. A function
-// with no statements is fully covered; a file absent from the profile is not.
-func coverage(blocks []cover.ProfileBlock, start, end token.Position) float64 {
+// coverage is the share of the function's statements that ran, and how many
+// statements there are and ran. A function with no statements is fully covered.
+func coverage(blocks []cover.ProfileBlock, start, end token.Position) (float64, int, int) {
 	total, hit := 0, 0
 	for _, b := range blocks {
 		if b.StartLine < start.Line || b.EndLine > end.Line {
@@ -92,9 +96,24 @@ func coverage(blocks []cover.ProfileBlock, start, end token.Position) float64 {
 		}
 	}
 	if total == 0 {
-		return 1
+		return 1, 0, 0
 	}
-	return float64(hit) / float64(total)
+	return float64(hit) / float64(total), total, hit
+}
+
+// statements counts a function's statements from its syntax, for a file the
+// profile does not mention. Blocks and case clauses only group statements.
+func statements(fn *ast.FuncDecl) int {
+	n := 0
+	ast.Inspect(fn.Body, func(node ast.Node) bool {
+		switch node.(type) {
+		case *ast.BlockStmt, *ast.CaseClause, *ast.CommClause:
+		case ast.Stmt:
+			n++
+		}
+		return true
+	})
+	return n
 }
 
 // pkg is the part of go list's output the analysis needs.
@@ -145,9 +164,9 @@ func analyzeFile(fset *token.FileSet, root string, p pkg, name string, blocks []
 		if !ok || fn.Body == nil {
 			continue
 		}
-		cov := 0.0
+		cov, total, hit := 0.0, statements(fn), 0
 		if profiled {
-			cov = coverage(blocks, fset.Position(fn.Pos()), fset.Position(fn.End()))
+			cov, total, hit = coverage(blocks, fset.Position(fn.Pos()), fset.Position(fn.End()))
 		}
 		cc := complexity(fn)
 		out = append(out, Func{
@@ -158,6 +177,8 @@ func analyzeFile(fset *token.FileSet, root string, p pkg, name string, blocks []
 			Complexity: cc,
 			Coverage:   cov,
 			CRAP:       score(cc, cov),
+			Statements: total,
+			Uncovered:  total - hit,
 		})
 	}
 	return out, nil
